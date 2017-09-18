@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using Inv;
 
 namespace InvDefaultW
 {
@@ -12,7 +11,6 @@ namespace InvDefaultW
         [STAThread]
         static void Main(string[] args)
         {
-
             Inv.WpfShell.CheckRequirements(() =>
             {
 #if DEBUG
@@ -26,6 +24,4 @@ namespace InvDefaultW
             });
         }
     }
-
-    
 }
