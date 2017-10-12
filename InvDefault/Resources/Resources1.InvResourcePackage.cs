@@ -1,4 +1,4 @@
-namespace Inv.Default
+namespace InvDefault
 {
   public static class Resources
   {

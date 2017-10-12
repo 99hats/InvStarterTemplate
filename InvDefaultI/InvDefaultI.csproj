@@ -89,6 +89,7 @@
   <ItemGroup>
     <Compile Include="Main.cs" />
     <Compile Include="AppDelegate.cs" />
+    <None Include="app.config" />
     <None Include="GettingStarted.Xamarin" />
     <None Include="Info.plist" />
     <Compile Include="Properties\AssemblyInfo.cs" />
@@ -97,20 +98,26 @@
     <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
+    <Reference Include="FFImageLoading, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>..\packages\Xamarin.FFImageLoading.2.2.18\lib\Xamarin.iOS10\FFImageLoading.dll</HintPath>
+    </Reference>
+    <Reference Include="FFImageLoading.Platform, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>..\packages\Xamarin.FFImageLoading.2.2.18\lib\Xamarin.iOS10\FFImageLoading.Platform.dll</HintPath>
+    </Reference>
     <Reference Include="HockeySDK, Version=1.0.6353.23782, Culture=neutral, processorArchitecture=MSIL">
       <HintPath>..\packages\HockeySDK.Xamarin.4.1.4\lib\Xamarin.iOS10\HockeySDK.dll</HintPath>
     </Reference>
     <Reference Include="HockeySDK.iOSBindings, Version=0.0.0.0, Culture=neutral, processorArchitecture=MSIL">
       <HintPath>..\packages\HockeySDK.Xamarin.4.1.4\lib\Xamarin.iOS10\HockeySDK.iOSBindings.dll</HintPath>
     </Reference>
-    <Reference Include="Inv.Library, Version=1.0.25.0, Culture=neutral, PublicKeyToken=014a23717efc9544, processorArchitecture=MSIL">
-      <HintPath>..\packages\Invention.Library.1.0.25\lib\portable45-net45+win8\Inv.Library.dll</HintPath>
+    <Reference Include="Inv.Library, Version=1.0.30.0, Culture=neutral, PublicKeyToken=014a23717efc9544, processorArchitecture=MSIL">
+      <HintPath>..\packages\Invention.Library.1.0.30\lib\portable45-net45+win8\Inv.Library.dll</HintPath>
     </Reference>
-    <Reference Include="Inv.Platform, Version=1.0.25.0, Culture=neutral, PublicKeyToken=014a23717efc9544, processorArchitecture=MSIL">
-      <HintPath>..\packages\Invention.Platform.1.0.25\lib\portable45-net45+win8\Inv.Platform.dll</HintPath>
+    <Reference Include="Inv.Platform, Version=1.0.30.0, Culture=neutral, PublicKeyToken=014a23717efc9544, processorArchitecture=MSIL">
+      <HintPath>..\packages\Invention.Platform.1.0.30\lib\portable45-net45+win8\Inv.Platform.dll</HintPath>
     </Reference>
-    <Reference Include="Inv.PlatformI, Version=1.0.25.0, Culture=neutral, PublicKeyToken=014a23717efc9544, processorArchitecture=MSIL">
-      <HintPath>..\packages\Invention.Platform.I.1.0.25\lib\xamarinios10\Inv.PlatformI.dll</HintPath>
+    <Reference Include="Inv.PlatformI, Version=1.0.30.0, Culture=neutral, PublicKeyToken=014a23717efc9544, processorArchitecture=MSIL">
+      <HintPath>..\packages\Invention.Platform.I.1.0.30\lib\xamarinios10\Inv.PlatformI.dll</HintPath>
     </Reference>
     <Reference Include="Microsoft.CSharp" />
     <Reference Include="Newtonsoft.Json, Version=10.0.0.0, Culture=neutral, PublicKeyToken=30ad4fe6b2a6aeed, processorArchitecture=MSIL">
@@ -121,6 +128,9 @@
     <Reference Include="System.Net.Http" />
     <Reference Include="System.Xml" />
     <Reference Include="System.Core" />
+    <Reference Include="WebP.Touch, Version=1.0.6443.32796, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>..\packages\WebP.Touch.1.0.4\lib\Xamarin.iOS10\WebP.Touch.dll</HintPath>
+    </Reference>
     <Reference Include="Xamarin.iOS" />
   </ItemGroup>
   <ItemGroup>
@@ -130,11 +140,11 @@
     </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildExtensionsPath)\Xamarin\iOS\Xamarin.iOS.CSharp.targets" />
-  <Import Project="..\packages\Invention.Library.1.0.25\build\Invention.Library.targets" Condition="Exists('..\packages\Invention.Library.1.0.25\build\Invention.Library.targets')" />
+  <Import Project="..\packages\Invention.Library.1.0.30\build\Invention.Library.targets" Condition="Exists('..\packages\Invention.Library.1.0.30\build\Invention.Library.targets')" />
   <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">
     <PropertyGroup>
       <ErrorText>This project references NuGet package(s) that are missing on this computer. Use NuGet Package Restore to download them.  For more information, see http://go.microsoft.com/fwlink/?LinkID=322105. The missing file is {0}.</ErrorText>
     </PropertyGroup>
-    <Error Condition="!Exists('..\packages\Invention.Library.1.0.25\build\Invention.Library.targets')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\Invention.Library.1.0.25\build\Invention.Library.targets'))" />
+    <Error Condition="!Exists('..\packages\Invention.Library.1.0.30\build\Invention.Library.targets')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\Invention.Library.1.0.30\build\Invention.Library.targets'))" />
   </Target>
 </Project>
