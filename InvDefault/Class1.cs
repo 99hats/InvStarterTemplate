@@ -32,26 +32,24 @@ namespace InvDefault
       mainOverlay.AddPanel(PopUpLayer);
       Base.Content = mainOverlay;
 
-      // default content
-      var logo = Base.NewGraphic();
-      logo.Image = InvDefault.Resources.Images.Logo;
-      logo.Size.SetWidth(100);
-
       var label = Base.NewLabel();
-      label.Background.Colour = Colour.WhiteSmoke;
+      label.Background.Colour = Colour.DodgerBlue;
+      label.Padding.Set(8);
+      label.Font.Size = 24;
+      label.Font.Colour = Colour.White; 
+      label.Alignment.Center();
       label.JustifyCenter();
       label.Text = "Click Me";
 
       var button = Base.NewButton();
-      button.Content = logo;
+      button.Content = label;
       button.Alignment.Stretch();
       button.Background.Colour = Colour.WhiteSmoke;
       button.SingleTapEvent += () =>
       {
-        var popup = new PopUpGraphic(this, InvDefault.Resources.Images.Logo);
+        var popup = new PopUpGraphic(this, InvMedia.Resources.Images.Logo);
         PopUpLayer.Transition(popup).Fade();
       };
-
       DefaultLayer.Transition(button);
     }
   }
@@ -65,7 +63,7 @@ namespace InvDefault
       var scrim = surface.NewFrame();
       scrim.Alignment.Stretch();
       scrim.Background.Colour = Colour.Black;
-      scrim.Opacity.Set(0.75f);
+      scrim.Opacity.Set(1f);
       Base.AddPanel(scrim);
 
       var graphic = surface.NewGraphic();

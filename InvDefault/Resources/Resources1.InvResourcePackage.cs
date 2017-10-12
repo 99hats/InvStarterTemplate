@@ -1,4 +1,4 @@
-namespace InvDefault
+namespace InvMedia
 {
   public static class Resources
   {
