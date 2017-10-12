@@ -7,9 +7,7 @@ namespace InvDefault
     public static void Install(Inv.Application Application)
     {
       Application.Title = "My Project";
-
       var Surface = new NavigationSurface(Application);
-
       Application.Window.Transition(Surface);
     }
   }
@@ -36,7 +34,7 @@ namespace InvDefault
       label.Background.Colour = Colour.DodgerBlue;
       label.Padding.Set(8);
       label.Font.Size = 24;
-      label.Font.Colour = Colour.White; 
+      label.Font.Colour = Colour.White;
       label.Alignment.Center();
       label.JustifyCenter();
       label.Text = "Click Me";
