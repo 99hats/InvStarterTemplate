@@ -1,4 +1,4 @@
-namespace Inv.Default
+namespace InvMedia
 {
   public static class Resources
   {
@@ -8,6 +8,7 @@ namespace Inv.Default
     }
 
     public static readonly ResourcesImages Images;
+    public static readonly Resourcesaudio audio;
   }
 
   public sealed class ResourcesImages
@@ -16,5 +17,13 @@ namespace Inv.Default
 
     ///<Summary>41.5 KB</Summary>
     public readonly global::Inv.Image Logo;
+  }
+
+  public sealed class Resourcesaudio
+  {
+    public Resourcesaudio() { }
+
+    ///<Summary>85.7 KB</Summary>
+    public readonly global::Inv.Sound CoolSmsTone;
   }
 }

@@ -13,6 +13,10 @@ namespace InvDefault
       var Surface = Application.Window.NewSurface();
       Surface.Background.Colour = Colour.WhiteSmoke;
 
+      Application.StartEvent += () =>
+      {
+        Application.Audio.Play(InvMedia.Resources.audio.CoolSmsTone, 1.00f, 1.00f);
+      };
       var pageDock = Surface.NewVerticalDock();
       
 
@@ -27,23 +31,25 @@ namespace InvDefault
 
       pageDock.AddClient( horizontalScroll);
       var mpoint = new Point(100,100);
+      var msize = new Point(20,20);
       var canvas = Surface.NewCanvas();
       canvas.Background.Colour = Colour.Black;
       canvas.DrawEvent += (DC) =>
       {
         colour = Colour.FromArgb(0, (byte)mpoint.X, (byte)mpoint.Y, 100);
-        DC.DrawEllipse(Colour.FromArgb((byte)255, (byte)mpoint.X, (byte)mpoint.Y, 100), Colour.White, 2,mpoint, new Point(20,20) );
+        DC.DrawEllipse(Colour.FromArgb((byte)255, (byte)mpoint.X, (byte)mpoint.Y, 100), Colour.White, 2,mpoint, msize );
       };
       canvas.Draw();
       canvas.MoveEvent += point =>
       {
         mpoint = point;
+        msize = new Point(30,30);
         
         canvas.Draw();
         Debug.WriteLine($" {point.X}x{point.Y}");
       };
       canvas.PressEvent += point => { mpoint = point; canvas.Draw(); };
-      canvas.ReleaseEvent += point => { mpoint = new Point(100, 100); canvas.Draw(); };
+      canvas.ReleaseEvent += point => { mpoint = new Point(100, 100); msize = new Point(20,20); canvas.Draw(); };
       pageDock.AddClient(canvas);
 
       var tabTexts = new List<string> { "Recent Posts", "Current Issue", "Events Calendar" };
