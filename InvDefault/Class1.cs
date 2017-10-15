@@ -1,5 +1,6 @@
 ﻿using Inv;
 using System.Collections.Generic;
+using System.Diagnostics;
 
 namespace InvDefault
 {
@@ -22,9 +23,29 @@ namespace InvDefault
       var horizontalScroll = Surface.NewHorizontalScroll();
       horizontalScroll.Content = tabsDock;
 
-      
+      Colour colour = Colour.FromArgb(0, 100, 100, 100);
 
       pageDock.AddClient( horizontalScroll);
+      var mpoint = new Point(100,100);
+      var canvas = Surface.NewCanvas();
+      canvas.Background.Colour = Colour.Black;
+      canvas.DrawEvent += (DC) =>
+      {
+        colour = Colour.FromArgb(0, (byte)mpoint.X, (byte)mpoint.Y, 100);
+        DC.DrawEllipse(Colour.FromArgb((byte)255, (byte)mpoint.X, (byte)mpoint.Y, 100), Colour.White, 2,mpoint, new Point(20,20) );
+      };
+      canvas.Draw();
+      canvas.MoveEvent += point =>
+      {
+        mpoint = point;
+        
+        canvas.Draw();
+        Debug.WriteLine($" {point.X}x{point.Y}");
+      };
+      canvas.PressEvent += point => { mpoint = point; canvas.Draw(); };
+      canvas.ReleaseEvent += point => { mpoint = new Point(100, 100); canvas.Draw(); };
+      pageDock.AddClient(canvas);
+
       var tabTexts = new List<string> { "Recent Posts", "Current Issue", "Events Calendar" };
 
       Label current = null;
