@@ -3,6 +3,7 @@ using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Linq;
 
 
 namespace InvDefault
@@ -33,7 +34,8 @@ namespace InvDefault
           animator = Animator
             .CreateEllipse(Colour.FromHSV(210, 0.88, 1.0), Colour.White, 2, new Point(100, 100), new Point(20, 20))
             .SetStartTime(stopwatch.Elapsed.TotalSeconds)
-            .Grow(20,600, 5);
+            .Grow(20,600, 5, false)
+            .FadeOut(5, false);
 
         animator
           .Update(DC, stopwatch.Elapsed.TotalSeconds);
@@ -182,8 +184,8 @@ namespace InvDefault
         //var t = 1f - (float) Math.Cos(perc * Math.PI * 0.5f);
         //var t = perc * perc;
         var t = (float)Math.Abs(progress);
-        t = t * t * (3f - 2f * t);
-        //t = t * t * t * (t * (6f * t - 15f) + 10f);
+        //t = t * t * (3f - 2f * t);
+        t = t * t * t * (t * (6f * t - 15f) + 10f);
         var size = Animator.Lerp(a, b, t);
         return size;
       }
@@ -196,33 +198,28 @@ namespace InvDefault
       return this;
     }
 
-    //public Animator FadeOut(int seconds)
-    //{
-    //  actions.Add(OnFadeOut);
-    //  return this;
+    public Animator FadeOut(int seconds, bool repeat)
+    {
+      var animation = new Animation(States.running, (double)seconds);
+      Animations.Add(animation);
+      animation.AnimateEvent += OnFadeOut;
+      return this;
 
-    //  void OnFadeOut()
-    //  {
-    //    double diff;
-    //    if (_timeDelta > seconds)
-    //    {
-    //      var mult = (int)(_timeDelta / seconds);
-    //      diff = _timeDelta - (mult * seconds);
-    //    }
-    //    else
-    //    {
-    //      diff = _timeDelta;
-    //    }
-    //    var perc = diff / (double)seconds;
-    //    var value = Lerp(1.0f, 0f, (float)perc);
-    //    Debug.WriteLine($"value {(float)value} {(float)perc} {_timeDelta} > {diff}");
-    //    AnimationStates.EllipseDrawable.Fill = Colour.FromHSV((double)210, (double)0.8, (double)value);
-    //    AnimationStates.EllipseDrawable.Stroke = Colour.FromHSV(0d, 0.0d, (double) value);
-    //  }
+      void OnFadeOut()
+      {
+        if (animation.isOverDuration && !repeat) { animation.States = States.completed;
+          return;
+        }
+        
+        if (animation.isOverDuration)
+          animation.AnimationStartTime = CurrentTime;
+        var value = animation.Lerp(1.0f, 0f);
+        Drawable.Fill = Colour.FromHSV((double)210, (double)0.8, (double)value);
+        Drawable.Stroke = Colour.FromHSV(0d, 0.0d, (double)value);
+      }
+    }
 
-    //}
-
-    public Animator Grow(int startsize, int maxsize, int duration)
+    public Animator Grow(int startsize, int maxsize, int duration, bool repeat)
     {
       var animation = new Animation(States.running, duration);
       Drawable.Size = new Point((int)startsize, (int)startsize);
@@ -232,6 +229,10 @@ namespace InvDefault
 
       void OnGrow()
       {
+        if (animation.isOverDuration && !repeat) { animation.States = States.completed;
+          return; // end early
+        }
+
         if (animation.AnimationStartTime == null || animation.isOverDuration) animation.AnimationStartTime = CurrentTime;
 
         if (Drawable.Size.X > maxsize)
@@ -250,7 +251,7 @@ namespace InvDefault
       DrawContract = dc;
       CurrentTime = timeDelta;
 
-      foreach (var animation in Animations)
+      foreach (var animation in Animations.Where(x=>x.States == States.running))
       {
         animation.AnimateEvent.Invoke();
       }
