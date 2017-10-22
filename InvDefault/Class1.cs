@@ -3,6 +3,7 @@ using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Dynamic;
 using System.Linq;
 
 
@@ -35,7 +36,7 @@ namespace InvDefault
             .CreateEllipse(Colour.FromHSV(210, 0.88, 1.0), Colour.White, 2, new Point(100, 100), new Point(20, 20))
             .SetStartTime(stopwatch.Elapsed.TotalSeconds)
             .Grow(20,600, 5, false)
-            .FadeOut(5, false);
+            .FadeIn(5, false);
 
         animator
           .Update(DC, stopwatch.Elapsed.TotalSeconds);
@@ -154,6 +155,8 @@ namespace InvDefault
       public double? AnimationEndTime => AnimationStartTime + Duration;
       public double Duration { get; set; }
 
+      public dynamic DynamicState { get; set; } = new ExpandoObject();
+
       public Animation(States state, double duration)
       {
         States = state;
@@ -203,6 +206,7 @@ namespace InvDefault
       var animation = new Animation(States.running, (double)seconds);
       Animations.Add(animation);
       animation.AnimateEvent += OnFadeOut;
+      animation.DynamicState.OriginalHSV = Drawable.Stroke;
       return this;
 
       void OnFadeOut()
@@ -213,9 +217,14 @@ namespace InvDefault
         
         if (animation.isOverDuration)
           animation.AnimationStartTime = CurrentTime;
+
+        double originalValue = (animation.DynamicState.OriginalHSV as Colour).GetHSLRecord().L;
+
         var value = animation.Lerp(1.0f, 0f);
         Drawable.Fill = Colour.FromHSV((double)210, (double)0.8, (double)value);
-        Drawable.Stroke = Colour.FromHSV(0d, 0.0d, (double)value);
+
+        var strokeValue = animation.Lerp((float) originalValue, 0f);
+        Drawable.Stroke = Colour.FromHSV(0d, 0.0d, (double)strokeValue);
       }
     }
 
@@ -273,6 +282,35 @@ namespace InvDefault
     {
       var serialized = JsonConvert.SerializeObject(source);
       return JsonConvert.DeserializeObject<T>(serialized);
+    }
+    public static Animator FadeIn(this Animator Animator, int seconds, bool repeat)
+    {
+      var animation = new Animator.Animation(Animator.States.running, (double)seconds);
+      Animator.Animations.Add(animation);
+      animation.AnimateEvent += OnAnimateEvent;
+      animation.DynamicState.OriginalHSV = Animator.Drawable.Stroke;
+      return Animator;
+
+      void OnAnimateEvent()
+      {
+        if (animation.isOverDuration && !repeat)
+        {
+          animation.States = Animator.States.completed;
+          return;
+        }
+
+        if (animation.isOverDuration)
+          animation.AnimationStartTime = Animator.CurrentTime;
+
+        var value = animation.Lerp(0f, 1f);
+        Animator.Drawable.Fill = Colour.FromHSV((double)210, (double)0.8, (double)value);
+
+        if (!(animation.DynamicState.OriginalHSV is Colour colour)) return;
+        double originalValue = colour.GetHSLRecord().L;
+
+        var strokeValue = animation.Lerp(0f, (float)originalValue);
+        Animator.Drawable.Stroke = Colour.FromHSV(0d, 0.0d, (double)strokeValue);
+      }
     }
   }
 }
