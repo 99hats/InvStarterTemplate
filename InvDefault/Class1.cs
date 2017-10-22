@@ -1,14 +1,15 @@
 ﻿using Inv;
+using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Diagnostics.Eventing.Reader;
+
 
 namespace InvDefault
 {
   public static class Shell
   {
-    public static void Install(Inv.Application Application)
+    public static void Install(Application Application)
     {
       Application.Title = "My Project";
 
@@ -20,14 +21,7 @@ namespace InvDefault
       var canvas = Surface.NewCanvas();
       canvas.Background.Colour = Colour.Black;
 
-      DateTime? last = null;
-      
-
-      var test = Animator.CreateAnimator()
-        .Ellipse(Colour.FromHSV((double)210, (double)0.88, (double)1.0), Colour.White, 2, new Point(100,100), new Point(20,20) )
-        .Grow(600, 5)
-        .FadeOut(5);
-
+      Animator animator = null;
       Stopwatch stopwatch = null;
 
       canvas.DrawEvent += DC =>
@@ -35,7 +29,14 @@ namespace InvDefault
         if (stopwatch == null)
           stopwatch = Stopwatch.StartNew();
 
-        test.Run(DC, stopwatch.Elapsed.TotalSeconds);
+        if (animator == null)
+          animator = Animator
+            .CreateEllipse(Colour.FromHSV(210, 0.88, 1.0), Colour.White, 2, new Point(100, 100), new Point(20, 20))
+            .Grow(600, 5);
+
+        animator
+          .SetStartTime(stopwatch.Elapsed.TotalSeconds)
+          .Update(DC, stopwatch.Elapsed.TotalSeconds);
       };
       pageDock.AddClient(canvas);
       Surface.ComposeEvent += () => canvas.Draw();
@@ -45,131 +46,185 @@ namespace InvDefault
     }
   }
 
-  public class EllipseStruct
+  //public class Animateable
+  //{
+  //  public Animator.States States { get; set; }
+  //  public double StartTime { get; set; }
+  //  public double EndTime { get; set; }
+  //}
+
+  public class Drawable
   {
-    public EllipseStruct(Colour fill, Colour stroke, int strokeWidth, Point position, Point size, DateTime start)
-    {
-      Fill = fill;
-      Stroke = stroke;
-      StrokeWidth = strokeWidth;
-      Position = position;
-      Size = size;
-      Start = start;
-      OriginalSize = size;
-    }
     public Colour Fill { get; set; }
     public Colour Stroke { get; set; }
     public int StrokeWidth { get; set; }
     public Point Position { get; set; }
     public Point Size { get; set; }
-    public DateTime Start { get; set; }
-    public Point OriginalSize { get; set; }
 
-  }  
+    public Drawable Original { get; set; }
+
+    public Action DrawEvent { get; set; }
+  }
+
+  public class EllipseDrawable : Mimic<Drawable>
+  {
+    public EllipseDrawable(Colour fill, Colour stroke, int strokeWidth, Point position, Point size)
+    {
+      Base = new Drawable
+      {
+        Fill = fill,
+        Stroke = stroke,
+        StrokeWidth = strokeWidth,
+        Position = position,
+        Size = size
+      };
+      Base.Original = Base;
+    }
+
+    public event Action DrawEvent
+    {
+      add => Base.DrawEvent += value;
+      remove => Base.DrawEvent -= value;
+    }
+  }
 
   public class Animator
   {
     public static DrawContract DrawContract;
+
     public enum DrawType
     {
-      line, ellipse, rectangle, text, image
+      line,
+      ellipse,
+      rectangle,
+      text,
+      image
     }
-    public enum States { created, running, cancelled, paused, completed }
+
+    public enum States
+    {
+      created,
+      running,
+      cancelled,
+      paused,
+      completed
+    }
+
     public static States State;
 
-    public static Stopwatch Stopwatch { get; set; }
+    public static Drawable Drawable { get; set; }
 
-    public class AnimationStates
-    {
-      public static EllipseStruct EllipseStruct { get; set; }
-    }
+    public List<Animation> Animations;
+
+    public static double StartTime { get; set; }
+    public static double CurrentTime { get; set; }
 
     private static double _timeDelta;
     public int count;
 
     public static List<Action> actions;
-    private float _opacity;
-    private int _seconds;
-    private DrawType _drawType;
-    private Colour _fillColour;
-    private Colour _borderColour;
-    private int _borderWidth;
-    private Point _location;
-    private Point _size;
+    private static DrawType _drawType;
 
     public static float Lerp(float a, float b, float f)
     {
       return (a * (1.0f - f)) + (b * f);
     }
 
-    public Animator CreateEllipse(Colour fill, Colour stroke, int strokeWidth, Point position, Point size)
+    public static Animator CreateEllipse(Colour fill, Colour stroke, int strokeWidth, Point position, Point size)
     {
       actions = new List<Action>();
-      State = States.created;
-      _drawType = DrawType.ellipse;
-      EllipseStruct ellipseStruct = new EllipseStruct(fill, stroke, strokeWidth, position, size, DateTime.UtcNow);
-      AnimationStates.EllipseStruct = ellipseStruct;
+      Drawable = new EllipseDrawable(fill, stroke, strokeWidth, position, size);
       return new Animator();
     }
 
-    public Animator Type(DrawType drawType)
+    public class Animation
     {
-      _drawType = drawType;
-      return this;
-    }
+      public States States { get; set; }
+      public double AnimationStartTime { get; set; }
+      public double AnimationEndTime => AnimationStartTime + Duration;
+      public double Duration { get; set; }
 
+      public Animation(States state, double duration)
+      {
+        States = state;
+        AnimationStartTime = StartTime;
+        Duration = duration;
+      }
+
+      public Action AnimateEvent;
+
+      public bool isOverDuration()
+      {
+        return CurrentTime > AnimationEndTime;
+      }
+
+      public double Progress()
+      {
+        var progress = CurrentTime - AnimationStartTime;
+        if (progress < 0) return 0d;
+        if (progress > Duration) return 1d;
+        return Duration / progress;
+      }
+    }
 
     // chaining functions
 
-    public Animator FadeOut(int seconds)
+    public Animator SetStartTime(double startTime)
     {
-      actions.Add(OnFadeOut);
+      StartTime = startTime;
       return this;
-
-      void OnFadeOut()
-      {
-        double diff;
-        if (_timeDelta > seconds)
-        {
-          var mult = (int)(_timeDelta / seconds);
-          diff = _timeDelta - (mult * seconds);
-        }
-        else
-        {
-          diff = _timeDelta;
-        }
-        var perc = diff / (double)seconds;
-        var value = Lerp(1.0f, 0f, (float)perc);
-        Debug.WriteLine($"value {(float)value} {(float)perc} {_timeDelta} > {diff}");
-        AnimationStates.EllipseStruct.Fill = Colour.FromHSV((double)210, (double)0.8, (double)value);
-      }
-
     }
 
-    public Animator Grow(int maxsize, int seconds)
+    //public Animator FadeOut(int seconds)
+    //{
+    //  actions.Add(OnFadeOut);
+    //  return this;
+
+    //  void OnFadeOut()
+    //  {
+    //    double diff;
+    //    if (_timeDelta > seconds)
+    //    {
+    //      var mult = (int)(_timeDelta / seconds);
+    //      diff = _timeDelta - (mult * seconds);
+    //    }
+    //    else
+    //    {
+    //      diff = _timeDelta;
+    //    }
+    //    var perc = diff / (double)seconds;
+    //    var value = Lerp(1.0f, 0f, (float)perc);
+    //    Debug.WriteLine($"value {(float)value} {(float)perc} {_timeDelta} > {diff}");
+    //    AnimationStates.EllipseDrawable.Fill = Colour.FromHSV((double)210, (double)0.8, (double)value);
+    //    AnimationStates.EllipseDrawable.Stroke = Colour.FromHSV(0d, 0.0d, (double) value);
+    //  }
+
+    //}
+
+    public Animator Grow(int maxsize, int duration)
     {
-      actions.Add(OnGrow);
+      var animation = new Animation(States.running, duration);
+      animation.AnimateEvent += OnGrow;
       return this;
 
       void OnGrow()
       {
-        var currentSize = AnimationStates.EllipseStruct.Size;
-        if (currentSize.X > maxsize)
+        if (Drawable.Size.X > maxsize)
         {
-          currentSize = AnimationStates.EllipseStruct.OriginalSize;
-          AnimationStates.EllipseStruct.Start = DateTime.UtcNow;
+          // reset
+          animation.AnimationStartTime = CurrentTime;
         }
-        double diff;
-        if (_timeDelta > seconds)
-        {
-          var mult = (int)(_timeDelta / seconds);
-          diff = _timeDelta - (mult * seconds);
-        }
-        else
-        {
-          diff = _timeDelta;
-        }
-        var perc = diff / (double)seconds;
+        //double diff;
+        //if (_timeDelta > duration)
+        //{
+        //  var mult = (int)(_timeDelta / duration);
+        //  diff = _timeDelta - (mult * duration);
+        //}
+        //else
+        //{
+        //  diff = _timeDelta;
+        //}
+        var perc = animation.Progress();
         //var timeDelta = (int)(DateTime.UtcNow - AnimationStates.EllipseStruct.Start).TotalSeconds;
         //var elapsed = Stopwatch.Elapsed.TotalMilliseconds;
         //var perc = (float) Stopwatch.Elapsed.TotalSeconds / seconds;
@@ -180,45 +235,37 @@ namespace InvDefault
         t = t * t * (3f - 2f * t);
         //t = t * t * t * (t * (6f * t - 15f) + 10f);
         var size = Lerp(20, 900, t);
-        var newSize = new Point((int)size, (int)size);
-        AnimationStates.EllipseStruct.Size = newSize;
+        Drawable.Size = new Point((int)size, (int)size);
       }
     }
-
 
     // ending functions
-    public Animator Run(DrawContract dc, double timeDelta)
+    public Animator Update(DrawContract dc, double timeDelta)
     {
-      if (State == States.created)
-        State = States.running;
-      _timeDelta = timeDelta;
+      CurrentTime = timeDelta;
 
-      foreach (var _action in actions)
+      foreach (var animation in Animations)
       {
-        _action.Invoke();
+        animation.AnimateEvent.Invoke();
       }
 
-      Draw(dc);
+      Drawable.DrawEvent.Invoke();
       return this;
-    }
-
-    private void Draw(DrawContract drawContract)
-    {
-      switch (_drawType)
-      {
-          case DrawType.ellipse:
-            var s = AnimationStates.EllipseStruct;
-            drawContract.DrawEllipse(s.Fill, s.Stroke, s.StrokeWidth, s.Position, s.Size);
-            break;
-        default:
-          break;
-      }
     }
 
     public Animator Stop()
     {
       State = States.cancelled;
       return this;
+    }
+  }
+
+  public static class Extensions
+  {
+    public static T Clone<T>(this T source)
+    {
+      var serialized = JsonConvert.SerializeObject(source);
+      return JsonConvert.DeserializeObject<T>(serialized);
     }
   }
 }
