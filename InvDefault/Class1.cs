@@ -21,25 +21,21 @@ namespace InvDefault
       canvas.Background.Colour = Colour.Black;
 
       DateTime? last = null;
-
+      
 
       var test = Animator.CreateAnimator()
-        .Ellipse(Colour.DodgerBlue, Colour.White, 2, new Point(100,100), new Point(20,20) )
-        .Grow(900, 3);
+        .Ellipse(Colour.FromHSV((double)210, (double)0.88, (double)1.0), Colour.White, 2, new Point(100,100), new Point(20,20) )
+        .Grow(600, 5)
+        .FadeOut(5);
+
+      Stopwatch stopwatch = null;
 
       canvas.DrawEvent += DC =>
       {
-        if (last == null)
-        {
-          last = DateTime.UtcNow;
-          ;
-          Debug.WriteLine("start");
-          return;
-        }
-        var now = DateTime.UtcNow;
-        var diff = ((TimeSpan)(now - last)).TotalSeconds;
-        test.Run(DC, diff);
-        last = now;
+        if (stopwatch == null)
+          stopwatch = Stopwatch.StartNew();
+
+        test.Run(DC, stopwatch.Elapsed.TotalSeconds);
       };
       pageDock.AddClient(canvas);
       Surface.ComposeEvent += () => canvas.Draw();
@@ -101,12 +97,18 @@ namespace InvDefault
     private Point _location;
     private Point _size;
 
-    public static Animator CreateAnimator()
+    public static float Lerp(float a, float b, float f)
+    {
+      return (a * (1.0f - f)) + (b * f);
+    }
+
+    public Animator CreateEllipse(Colour fill, Colour stroke, int strokeWidth, Point position, Point size)
     {
       actions = new List<Action>();
       State = States.created;
-      Stopwatch = new Stopwatch();
-      Stopwatch.Start();
+      _drawType = DrawType.ellipse;
+      EllipseStruct ellipseStruct = new EllipseStruct(fill, stroke, strokeWidth, position, size, DateTime.UtcNow);
+      AnimationStates.EllipseStruct = ellipseStruct;
       return new Animator();
     }
 
@@ -115,70 +117,74 @@ namespace InvDefault
       _drawType = drawType;
       return this;
     }
+
+
     // chaining functions
-    public Animator Counter()
-    {
-      count = 0;
-      actions.Add(UpdateCount);
-      return this;
-    }
 
-    public Animator Ellipse(Colour fill, Colour stroke, int strokeWidth, Point position, Point size)
+    public Animator FadeOut(int seconds)
     {
-
-      _drawType = DrawType.ellipse;
-      EllipseStruct ellipseStruct = new EllipseStruct(fill, stroke, strokeWidth, position, size, DateTime.UtcNow);
-      AnimationStates.EllipseStruct = ellipseStruct;
+      actions.Add(OnFadeOut);
       return this;
+
+      void OnFadeOut()
+      {
+        double diff;
+        if (_timeDelta > seconds)
+        {
+          var mult = (int)(_timeDelta / seconds);
+          diff = _timeDelta - (mult * seconds);
+        }
+        else
+        {
+          diff = _timeDelta;
+        }
+        var perc = diff / (double)seconds;
+        var value = Lerp(1.0f, 0f, (float)perc);
+        Debug.WriteLine($"value {(float)value} {(float)perc} {_timeDelta} > {diff}");
+        AnimationStates.EllipseStruct.Fill = Colour.FromHSV((double)210, (double)0.8, (double)value);
+      }
+
     }
 
     public Animator Grow(int maxsize, int seconds)
     {
-      
-      actions.Add(()=>OnGrow(maxsize, seconds));
+      actions.Add(OnGrow);
       return this;
-    }
 
-    public static void OnGrow(int maxsize, int seconds)
-    {
-      if (Stopwatch == null)
+      void OnGrow()
       {
-        Stopwatch = new Stopwatch();
-        Stopwatch.Start();
+        var currentSize = AnimationStates.EllipseStruct.Size;
+        if (currentSize.X > maxsize)
+        {
+          currentSize = AnimationStates.EllipseStruct.OriginalSize;
+          AnimationStates.EllipseStruct.Start = DateTime.UtcNow;
+        }
+        double diff;
+        if (_timeDelta > seconds)
+        {
+          var mult = (int)(_timeDelta / seconds);
+          diff = _timeDelta - (mult * seconds);
+        }
+        else
+        {
+          diff = _timeDelta;
+        }
+        var perc = diff / (double)seconds;
+        //var timeDelta = (int)(DateTime.UtcNow - AnimationStates.EllipseStruct.Start).TotalSeconds;
+        //var elapsed = Stopwatch.Elapsed.TotalMilliseconds;
+        //var perc = (float) Stopwatch.Elapsed.TotalSeconds / seconds;
+        //var t = (float)Math.Sin(perc * Math.PI * 0.5f);
+        //var t = 1f - (float) Math.Cos(perc * Math.PI * 0.5f);
+        //var t = perc * perc;
+        var t = (float)Math.Abs(perc);
+        t = t * t * (3f - 2f * t);
+        //t = t * t * t * (t * (6f * t - 15f) + 10f);
+        var size = Lerp(20, 900, t);
+        var newSize = new Point((int)size, (int)size);
+        AnimationStates.EllipseStruct.Size = newSize;
       }
-      var currentSize = AnimationStates.EllipseStruct.Size;
-      if (currentSize.X > maxsize)
-      {
-        currentSize = AnimationStates.EllipseStruct.OriginalSize;
-        AnimationStates.EllipseStruct.Start = DateTime.UtcNow;
-        Stopwatch = Stopwatch.StartNew();
-      }
-      var timeDelta = (int)(DateTime.UtcNow - AnimationStates.EllipseStruct.Start).TotalSeconds;
-      var elapsed = Stopwatch.Elapsed.TotalMilliseconds;
-      var size = currentSize.X +  (int)(Stopwatch.Elapsed.TotalMilliseconds / 1000) * seconds;
-      //var size = currentSize.X + Math.Abs((int) (timeDelta * seconds));
-      Debug.WriteLine($"{size} {currentSize.X} {timeDelta} * {seconds} | {elapsed}");
-      var newSize = new Point(size, size);
-      AnimationStates.EllipseStruct.Size = newSize;
     }
 
-    public Animator FadeIn(int seconds)
-    {
-      _seconds = seconds;
-      _opacity = 0.0f;
-      actions.Add(OnFadeIn);
-      return this;
-    }
-
-    private void OnFadeIn()
-    {
-      _opacity += _opacity * (float)_timeDelta;
-    }
-
-    private void UpdateCount()
-    {
-      count++;
-    }
 
     // ending functions
     public Animator Run(DrawContract dc, double timeDelta)
