@@ -32,10 +32,10 @@ namespace InvDefault
         if (animator == null)
           animator = Animator
             .CreateEllipse(Colour.FromHSV(210, 0.88, 1.0), Colour.White, 2, new Point(100, 100), new Point(20, 20))
-            .Grow(600, 5);
+            .SetStartTime(stopwatch.Elapsed.TotalSeconds)
+            .Grow(20,600, 5);
 
         animator
-          .SetStartTime(stopwatch.Elapsed.TotalSeconds)
           .Update(DC, stopwatch.Elapsed.TotalSeconds);
       };
       pageDock.AddClient(canvas);
@@ -114,7 +114,7 @@ namespace InvDefault
 
     public static Drawable Drawable { get; set; }
 
-    public List<Animation> Animations;
+    public static List<Animation> Animations;
 
     public static double StartTime { get; set; }
     public static double CurrentTime { get; set; }
@@ -133,15 +133,23 @@ namespace InvDefault
     public static Animator CreateEllipse(Colour fill, Colour stroke, int strokeWidth, Point position, Point size)
     {
       actions = new List<Action>();
+      Animations = new List<Animation>();
       Drawable = new EllipseDrawable(fill, stroke, strokeWidth, position, size);
+      Drawable.DrawEvent += DrawEllipseEvent;
       return new Animator();
+    }
+
+    private static void DrawEllipseEvent()
+    {
+      var d = Drawable;
+      DrawContract.DrawEllipse(d.Fill, d.Stroke, d.StrokeWidth, d.Position, d.Size);
     }
 
     public class Animation
     {
       public States States { get; set; }
-      public double AnimationStartTime { get; set; }
-      public double AnimationEndTime => AnimationStartTime + Duration;
+      public double? AnimationStartTime { get; set; }
+      public double? AnimationEndTime => AnimationStartTime + Duration;
       public double Duration { get; set; }
 
       public Animation(States state, double duration)
@@ -153,22 +161,35 @@ namespace InvDefault
 
       public Action AnimateEvent;
 
-      public bool isOverDuration()
-      {
-        return CurrentTime > AnimationEndTime;
-      }
+      public bool isOverDuration => CurrentTime > AnimationEndTime;
 
       public double Progress()
       {
+        if (AnimationStartTime == null) return 0d;
         var progress = CurrentTime - AnimationStartTime;
         if (progress < 0) return 0d;
         if (progress > Duration) return 1d;
-        return Duration / progress;
+        return (double)(progress / Duration);
+      }
+
+      public double Lerp(float a, float b)
+      {
+        var progress = Progress();
+        //var timeDelta = (int)(DateTime.UtcNow - AnimationStates.EllipseStruct.Start).TotalSeconds;
+        //var elapsed = Stopwatch.Elapsed.TotalMilliseconds;
+        //var perc = (float) Stopwatch.Elapsed.TotalSeconds / seconds;
+        //var t = (float)Math.Sin(perc * Math.PI * 0.5f);
+        //var t = 1f - (float) Math.Cos(perc * Math.PI * 0.5f);
+        //var t = perc * perc;
+        var t = (float)Math.Abs(progress);
+        t = t * t * (3f - 2f * t);
+        //t = t * t * t * (t * (6f * t - 15f) + 10f);
+        var size = Animator.Lerp(a, b, t);
+        return size;
       }
     }
 
     // chaining functions
-
     public Animator SetStartTime(double startTime)
     {
       StartTime = startTime;
@@ -201,40 +222,24 @@ namespace InvDefault
 
     //}
 
-    public Animator Grow(int maxsize, int duration)
+    public Animator Grow(int startsize, int maxsize, int duration)
     {
       var animation = new Animation(States.running, duration);
+      Drawable.Size = new Point((int)startsize, (int)startsize);
       animation.AnimateEvent += OnGrow;
+      Animations.Add(animation);
       return this;
 
       void OnGrow()
       {
+        if (animation.AnimationStartTime == null || animation.isOverDuration) animation.AnimationStartTime = CurrentTime;
+
         if (Drawable.Size.X > maxsize)
         {
           // reset
           animation.AnimationStartTime = CurrentTime;
         }
-        //double diff;
-        //if (_timeDelta > duration)
-        //{
-        //  var mult = (int)(_timeDelta / duration);
-        //  diff = _timeDelta - (mult * duration);
-        //}
-        //else
-        //{
-        //  diff = _timeDelta;
-        //}
-        var perc = animation.Progress();
-        //var timeDelta = (int)(DateTime.UtcNow - AnimationStates.EllipseStruct.Start).TotalSeconds;
-        //var elapsed = Stopwatch.Elapsed.TotalMilliseconds;
-        //var perc = (float) Stopwatch.Elapsed.TotalSeconds / seconds;
-        //var t = (float)Math.Sin(perc * Math.PI * 0.5f);
-        //var t = 1f - (float) Math.Cos(perc * Math.PI * 0.5f);
-        //var t = perc * perc;
-        var t = (float)Math.Abs(perc);
-        t = t * t * (3f - 2f * t);
-        //t = t * t * t * (t * (6f * t - 15f) + 10f);
-        var size = Lerp(20, 900, t);
+        var size = animation.Lerp((float)startsize, (float)maxsize);
         Drawable.Size = new Point((int)size, (int)size);
       }
     }
@@ -242,6 +247,7 @@ namespace InvDefault
     // ending functions
     public Animator Update(DrawContract dc, double timeDelta)
     {
+      DrawContract = dc;
       CurrentTime = timeDelta;
 
       foreach (var animation in Animations)
