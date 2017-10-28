@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 15
-VisualStudioVersion = 15.0.26430.16
+VisualStudioVersion = 15.0.27004.2002
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "InvDefault", "InvDefault\InvDefault.csproj", "{E87C3B5A-D5BD-4E01-9310-28F9127B25AB}"
 EndProject
@@ -304,5 +304,11 @@ Global
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {1A1EC1F0-0A60-499C-8467-356A23967979}
+	EndGlobalSection
+	GlobalSection(CodealikeProperties) = postSolution
+		SolutionGuid = e8d99395-d0cc-4918-a855-a1aa40a32f0b
 	EndGlobalSection
 EndGlobal
