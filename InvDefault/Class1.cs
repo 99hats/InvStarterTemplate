@@ -25,53 +25,49 @@ namespace InvDefault
       Application.Window.Transition(Surface);
     }
   }
+
   internal sealed class MainPage : Mimic<Dock>
   {
     private int imageId;
 
+    public LayoutPool LayoutPool { get; set; }
+
     public MainPage(Surface surface)
     {
       Base = surface.NewVerticalDock();
+      LayoutPool = new LayoutPool(surface, 33, 11);
+
       ContentFrame = surface.NewFrame();
       Base.AddClient(ContentFrame);
       imageId = 0;
 
-      Cells = new List<WebGraphic>(99);
-
       surface.ArrangeEvent += UpdateUI;
 
-      // content pool
-      for (int i = 0; i < 11; i++)  // add 1 full page
-      {
-        AddRow();
-      }
+      AddCells(33);
 
-      void AddRow()
+      void AddCells(int num)
       {
-        for (int i = 0; i < 3; i++)
+        for (int i = 0; i < num; i++)
         {
           imageId += 1;
-          var graphic = new WebGraphic(surface, $"https://unsplash.it/300/200?image={imageId}");
+          Debug.WriteLine($"add {imageId}");
+          var graphic = new WebGraphic(surface, $"https://unsplash.it/300/200/?image={imageId}");
           graphic.Alignment.Stretch();
           graphic.Margin.Set(4);
-          Cells.Insert(0, graphic);
+          LayoutPool.AddCellPanel(graphic);
         }
       }
 
-      // layout pool
+      // layout
       Stack = surface.NewVerticalStack();
-      Rows = new List<Stack>();
 
-      Grid = new Frame[3, 11];
-
+      // 3 columns by 11 rows
       for (int r = 0; r < 11; r++)
       {
-        var row = surface.NewHorizontalDock();
+        var row = LayoutPool.RowDocks[r];
         for (int c = 0; c < 3; c++)
         {
-          var frame = surface.NewFrame();
-          Grid[c, r] = frame;
-          row.AddClient(frame);
+          row.AddClient(LayoutPool.Frames[r * 3 + c]);
         }
         Stack.AddPanel(row);
       }
@@ -82,47 +78,17 @@ namespace InvDefault
       void UpdateUI()
       {
         if (surface.Window.Width < 1) return;
-
-        // add 33 more photos (1 full page) 
-        for (int i = 0; i < 11; i++)
-        {
-          AddRow();
-        }
-
-        // aggressive attempts at memory reclamaion
-        // dispose, deref and reclaim
-
-        // when adding 1 row (3 graphics at a time)
-        // 600x400 50+ rotations
-        // 
-        // when adding 11 rows (1 pages worth)
-        // 300x200 23 rotations with no dispose, deref or reclaim
-        // 300x200 23 rotations with dispose, deref, no reclaim
-        // 300x200 23 rotations with reclaim no dispose, deref
-        // 300x200 75+ (I gave up trying to crash it) with dispose, deref and reclaim
-        // 600x400 6 rotations with dispose, deref and reclaim (for high dpi screens)
-
-        if (Cells.Count >= 66)
-        {
-          //dispose
-          for (int i = 33; i < Cells.Count - 33; i++)
-          {
-            (Cells.ElementAt(i) as IDisposable)?.Dispose(); // same as Base.Image = null
-          }
-          //deref
-          Cells.RemoveRange(33, Cells.Count - 33); 
-        }
-        // reclaim
-        surface.Window.Application.Process.MemoryReclamation();
+        AddCells(33);
+        LayoutPool.Reclaim();
 
         for (int r = 0; r < 11; r++)
         {
           for (int c = 0; c < 3; c++)
           {
             var index = r * 3 + c;
-            var gcell = Grid[c, r];
-            var cell = Cells[index];
-            gcell.Transition(cell).Fade();
+            var frame = LayoutPool.Frames[index];
+            var cell = LayoutPool.CellPanels[index];
+            frame.Transition(cell).Fade();
           }
         }
 
@@ -132,12 +98,69 @@ namespace InvDefault
       }
     }
 
-    public List<WebGraphic> Cells { get; set; }
-    public Frame ContentFrame { get; set; }
-    public Frame[,] Grid { get; set; }
-    public List<Stack> Rows { get; set; }
+    public Frame ContentFrame { get; set; } // necessary?
     public Scroll Scroll { get; private set; }
     public Stack Stack { get; set; }
+  }
+
+  /// <summary>
+  /// Long-lived objects
+  /// RowDocks contain frames which are loaded with CellPanels
+  ///
+  /// </summary>
+  public class LayoutPool
+  {
+    public List<Frame> Frames { get; set; }
+    public List<Panel> CellPanels { get; set; }
+    public List<Dock> RowDocks { get; set; }
+
+    public Surface Surface { get; set; }
+    private int Size;
+
+    public LayoutPool(Surface surface, int size, int rows)
+    {
+      Surface = surface;
+      Size = size;
+      Frames = new List<Frame>(size);
+      for (int i = 0; i < size; i++)
+      {
+        var frame = surface.NewFrame();
+        Frames.Add(frame);
+      }
+      CellPanels = new List<Panel>(NextPrime(size * 2));
+      RowDocks = new List<Dock>(NextPrime(rows));
+      for (int i = 0; i < rows; i++)
+      {
+        var dock = surface.NewHorizontalDock();
+        RowDocks.Add(dock);
+      }
+    }
+
+    public void AddCellPanel(WebGraphic cell)
+    {
+      CellPanels.Insert(0, cell);
+    }
+
+    public void Reclaim()
+    {
+      if (CellPanels.Count >= Size * 2)
+      {
+        Debug.WriteLine($"Reclaiming {CellPanels.Count}");
+        //dispose
+        for (int i = 33; i < CellPanels.Count - 33; i++)
+          (CellPanels.ElementAt(i) as IDisposable)?.Dispose();
+        //deref
+        CellPanels.RemoveRange(Size, CellPanels.Count - Size);
+        //reclaim
+        Surface.Window.Application.Process.MemoryReclamation();
+      }
+    }
+
+    private static int NextPrime(int a)
+    {
+      while (true) { a++; if (a < 2) continue; if (a == 2) break; if (a % 2 == 0) continue; bool flag = false; for (int i = 3; (i * i) <= a; i += 2) { if (a % i == 0) { flag = true; break; } } if (!flag) break; }
+      return a;
+    }
   }
 
   public class WebGraphic : Mimic<Graphic>, IDisposable
@@ -207,7 +230,6 @@ namespace InvDefault
     public void Dispose()
     {
       Base.Surface.Window.Call(() => { Base.Image = null; });
-      GC.SuppressFinalize(this);
     }
   }
 }
