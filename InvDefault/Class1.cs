@@ -6,6 +6,7 @@ using System.IO;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
+using Inv.Support;
 
 namespace InvDefault
 {
@@ -75,10 +76,9 @@ namespace InvDefault
       }
     }
 
-    public Frame ContentFrame { get; set; }
-    public LayoutPool LayoutPool { get; set; }
-    // necessary?
-    public Scroll Scroll { get; private set; }
+    private Frame ContentFrame { get; set; }
+    private LayoutPool LayoutPool { get; set; }
+    private Scroll Scroll { get; }
   }
 
   public class LayoutPool
@@ -107,12 +107,12 @@ namespace InvDefault
       BuildTable();
     }
 
-    private List<Panel> CellPanels              { get; set; }
-    private int         Cols                    { get; set; }
-    private List<Frame> Frames                  { get; set; }
-    private List<Dock>  RowDocks                { get; set; }
-    private int         Rows                    { get; set; }
-    private Surface     Surface                 { get; set; }
+    private List<Panel> CellPanels              { get; }
+    private int         Cols                    { get; }
+    private List<Frame> Frames                  { get; }
+    private List<Dock>  RowDocks                { get; }
+    private int         Rows                    { get; }
+    private Surface     Surface                 { get; }
     public  Table       Table                   { get; set; }
 
     public void AddCellPanel(WebGraphic cell) => CellPanels.Insert(0, cell);
@@ -138,7 +138,7 @@ namespace InvDefault
     {
       if (CellPanels.Count >= Size * 2)
       {
-        Debug.WriteLine($"Reclaiming {CellPanels.Count}");
+        Debug.WriteLine($"Reclaiming at {CellPanels.Count}");
         //dispose
         for (int i = 33; i < CellPanels.Count - 33; i++)
           (CellPanels.ElementAt(i) as IDisposable)?.Dispose();
