@@ -64,17 +64,24 @@ namespace InvDefault
 
       var title = surface.NewLabel();
       title.Text = Asset.title;
-      title.Font.Size = 24;
+      //title.Font.Size = 24;
 
       var graphic = new WebGraphic(surface, Asset.uri);
+      var width = surface.Window.Width / 3;
+      var height = graphic.aspectHeight(width);
+      graphic.Size.Set(surface.Window.Width/3, height);
+      //var graphic = surface.NewGraphic();
+      //graphic.Image = InvMedia.Resources.Images.Logo;
       graphic.Alignment.Stretch();
 
      
-      var verticalDock = surface.NewVerticalDock();
-      verticalDock.AddHeader(graphic);
-      verticalDock.AddFooter(title);
-
+      var verticalDock = surface.NewVerticalStack();
+      verticalDock.Alignment.Stretch();
+      verticalDock.AddPanel(graphic);
+      verticalDock.AddPanel(title);
+      verticalDock.Readjust();
       Base.Content = verticalDock;
+      Base.Readjust();
     }
 
     public Size Size => Base.Size;
@@ -114,8 +121,7 @@ namespace InvDefault
         {
           var asset = new AssetPanel(surface, Assets[i]);
           asset.Alignment.Stretch();
-          asset.Background.Colour = Colour.Red; ;
-          asset.Margin.Set(4);
+          asset.Margin.Set(8);
           BTFLayoutPool.AddCellPanel(asset);
         }
       }
@@ -248,6 +254,7 @@ namespace InvDefault
         var thebytes = cache.ReadAllBytes();
         var image = new Image(thebytes, ".jpg");
         Base.Image = image;
+        Base.Readjust();
         var dimensions = application.Graphics.GetDimension(Base.Image);
         aspectRatio = dimensions.Height / (float)dimensions.Width;
         var FadeInAnimation = surface.NewAnimation();
