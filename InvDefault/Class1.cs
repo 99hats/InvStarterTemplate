@@ -27,14 +27,78 @@ namespace InvDefault
     }
   }
 
+  public static class Models
+  {
+
+    public static int last { get; set; } = 0;
+
+    public class Asset
+    {
+      public string title { get; set; }
+      public string uri { get; set; }
+    }
+
+    public static List<Asset> CreateAssets(int num)
+    {
+      List<Asset> result = new List<Asset>();
+      for (int i = 0; i < num; i++)
+      {
+        result.Add(new Asset{ title = Colour.All[i + last].ToString(), uri = $"http://picsum.photos/300/200/?image={i+last}"});
+      }
+      last += num;
+      if (last > 99) last = 0;
+      return result;
+    }
+  }
+
+  public class AssetPanel : Mimic<Button>
+  {
+    public Surface Surface { get; }
+    public Models.Asset Asset { get; set; }
+
+    public AssetPanel(Surface surface, Models.Asset asset)
+    {
+      Surface = surface;
+      Base = surface.NewButton();
+      Asset = asset;
+
+      var title = surface.NewLabel();
+      title.Text = Asset.title;
+      title.Font.Size = 24;
+
+      var graphic = new WebGraphic(surface, Asset.uri);
+      graphic.Alignment.Stretch();
+
+     
+      var verticalDock = surface.NewVerticalDock();
+      verticalDock.AddHeader(graphic);
+      verticalDock.AddFooter(title);
+
+      Base.Content = verticalDock;
+    }
+
+    public Size Size => Base.Size;
+    public Alignment Alignment => Base.Alignment;
+    public Background Background => Base.Background;
+    public Margin Margin => Base.Margin;
+
+  }
+
   internal sealed class MainPage : Mimic<Dock>
   {
     private int imageId;
 
+    private List<Models.Asset> Assets { get; set; }
+
     public MainPage(Surface surface)
     {
       Base = surface.NewVerticalDock();
-      LayoutPool = new LayoutPool(surface, 33, 11, 3);
+
+      Assets = Models.CreateAssets(38);
+
+      HeroLayoutPool = new LayoutPool(surface, 1, 1, 1);
+      ATFLayoutPool = new LayoutPool(surface, 3, 1, 3);
+      BTFLayoutPool = new LayoutPool(surface, 33, 11, 3);
 
       ContentFrame = surface.NewFrame();
       Base.AddClient(ContentFrame);
@@ -42,33 +106,31 @@ namespace InvDefault
 
       surface.ArrangeEvent += UpdateUI;
 
-      AddCells(33);
+      AddBelowTheFold(5, 33);
 
-      void AddCells(int num)
+      void AddBelowTheFold(int start, int num)
       {
-        for (int i = 0; i < num; i++)
+        for (int i = start; i < num; i++)
         {
-          imageId += 1;
-          Debug.WriteLine($"add {imageId}");
-          var graphic = new WebGraphic(surface, $"https://unsplash.it/300/200/?image={imageId}");
-          graphic.Alignment.Stretch();
-          graphic.Background.Colour = Colour.Red; ;
-          graphic.Margin.Set(4);
-          LayoutPool.AddCellPanel(graphic);
+          var asset = new AssetPanel(surface, Assets[i]);
+          asset.Alignment.Stretch();
+          asset.Background.Colour = Colour.Red; ;
+          asset.Margin.Set(4);
+          BTFLayoutPool.AddCellPanel(asset);
         }
       }
 
       // layout
       Scroll = surface.NewVerticalScroll();
-      Scroll.Content = LayoutPool.Table;
+      Scroll.Content = BTFLayoutPool.Table;
       ContentFrame.Transition(Scroll);
 
       void UpdateUI()
       {
         if (surface.Window.Width < 1) return;
-        AddCells(33);
-        LayoutPool.Reclaim();
-        LayoutPool.UpdateLayout();
+        AddBelowTheFold(5,33);
+        BTFLayoutPool.Reclaim();
+        BTFLayoutPool.UpdateLayout();
 
         if (imageId > 99) imageId = 0;
 
@@ -76,8 +138,12 @@ namespace InvDefault
       }
     }
 
+    public LayoutPool HeroLayoutPool { get; set; }
+
+    public LayoutPool ATFLayoutPool { get; set; }
+
     private Frame ContentFrame { get; set; }
-    private LayoutPool LayoutPool { get; set; }
+    private LayoutPool BTFLayoutPool { get; set; }
     private Scroll Scroll { get; }
   }
 
@@ -115,7 +181,7 @@ namespace InvDefault
     private Surface     Surface                 { get; }
     public  Table       Table                   { get; set; }
 
-    public void AddCellPanel(WebGraphic cell) => CellPanels.Insert(0, cell);
+    public void AddCellPanel(Panel cell) => CellPanels.Insert(0, cell);
 
     public void BuildTable()
     {
