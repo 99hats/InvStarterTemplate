@@ -53,26 +53,17 @@ namespace InvDefault
           Debug.WriteLine($"add {imageId}");
           var graphic = new WebGraphic(surface, $"https://unsplash.it/300/200/?image={imageId}");
           graphic.Alignment.Stretch();
+          graphic.Background.Colour = Colour.Red;;
           graphic.Margin.Set(4);
           LayoutPool.AddCellPanel(graphic);
         }
       }
 
       // layout
-      Stack = surface.NewVerticalStack();
-
-      // 3 columns by 11 rows
-      for (int r = 0; r < 11; r++)
-      {
-        var row = LayoutPool.RowDocks[r];
-        for (int c = 0; c < 3; c++)
-        {
-          row.AddClient(LayoutPool.Frames[r * 3 + c]);
-        }
-        Stack.AddPanel(row);
-      }
+      //LayoutPool.Table = surface.NewTable();
+     
       Scroll = surface.NewVerticalScroll();
-      Scroll.Content = Stack;
+      Scroll.Content = LayoutPool.Table;
       ContentFrame.Transition(Scroll);
 
       void UpdateUI()
@@ -80,17 +71,7 @@ namespace InvDefault
         if (surface.Window.Width < 1) return;
         AddCells(33);
         LayoutPool.Reclaim();
-
-        for (int r = 0; r < 11; r++)
-        {
-          for (int c = 0; c < 3; c++)
-          {
-            var index = r * 3 + c;
-            var frame = LayoutPool.Frames[index];
-            var cell = LayoutPool.CellPanels[index];
-            frame.Transition(cell).Fade();
-          }
-        }
+        LayoutPool.UpdateLayout();
 
         if (imageId > 99) imageId = 0;
 
@@ -100,7 +81,8 @@ namespace InvDefault
 
     public Frame ContentFrame { get; set; } // necessary?
     public Scroll Scroll { get; private set; }
-    public Stack Stack { get; set; }
+    //public Table Table { get; set; }
+    
   }
 
   /// <summary>
@@ -113,6 +95,7 @@ namespace InvDefault
     public List<Frame> Frames { get; set; }
     public List<Panel> CellPanels { get; set; }
     public List<Dock> RowDocks { get; set; }
+    public Table Table { get; set; }
 
     public Surface Surface { get; set; }
     private int Size;
@@ -120,6 +103,7 @@ namespace InvDefault
     public LayoutPool(Surface surface, int size, int rows)
     {
       Surface = surface;
+      
       Size = size;
       Frames = new List<Frame>(size);
       for (int i = 0; i < size; i++)
@@ -134,6 +118,46 @@ namespace InvDefault
         var dock = surface.NewHorizontalDock();
         RowDocks.Add(dock);
       }
+      BuildTable();
+    }
+
+    public void BuildTable()
+    {
+      Table = Surface.NewTable();
+      var tableColumn = Table.AddColumn();
+      tableColumn.Star();
+
+      // 3 columns by 11 rows
+      for (int r = 0; r < 11; r++)
+      {
+        var tableRow = Table.AddRow();
+        tableRow.Auto();
+
+
+        var row = RowDocks[r];
+        for (int c = 0; c < 3; c++)
+        {
+          row.AddClient(Frames[r * 3 + c]);
+
+        }
+        //Table.AddPanel(row);
+        Table.GetCell(0, r).Content = row;
+      }
+    }
+
+    public void UpdateLayout()
+    {
+      for (int r = 0; r < 11; r++)
+      {
+        for (int c = 0; c < 3; c++)
+        {
+          var index = r * 3 + c;
+          var frame = Frames[index];
+          var cell = CellPanels[index];
+          frame.Transition(cell).Fade();
+        }
+      }
+
     }
 
     public void AddCellPanel(WebGraphic cell)
@@ -215,6 +239,7 @@ namespace InvDefault
     public double? aspectRatio { get; set; }
     public Margin Margin => Base.Margin;
     public Size Size => Base.Size;
+    public Background Background => Base.Background;
 
     public static String GetMD5Hash(String TextToHash)
 
