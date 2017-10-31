@@ -30,12 +30,10 @@ namespace InvDefault
   {
     private int imageId;
 
-    public LayoutPool LayoutPool { get; set; }
-
     public MainPage(Surface surface)
     {
       Base = surface.NewVerticalDock();
-      LayoutPool = new LayoutPool(surface, 33, 11);
+      LayoutPool = new LayoutPool(surface, 33, 11, 3);
 
       ContentFrame = surface.NewFrame();
       Base.AddClient(ContentFrame);
@@ -53,15 +51,13 @@ namespace InvDefault
           Debug.WriteLine($"add {imageId}");
           var graphic = new WebGraphic(surface, $"https://unsplash.it/300/200/?image={imageId}");
           graphic.Alignment.Stretch();
-          graphic.Background.Colour = Colour.Red;;
+          graphic.Background.Colour = Colour.Red; ;
           graphic.Margin.Set(4);
           LayoutPool.AddCellPanel(graphic);
         }
       }
 
       // layout
-      //LayoutPool.Table = surface.NewTable();
-     
       Scroll = surface.NewVerticalScroll();
       Scroll.Content = LayoutPool.Table;
       ContentFrame.Transition(Scroll);
@@ -79,32 +75,22 @@ namespace InvDefault
       }
     }
 
-    public Frame ContentFrame { get; set; } // necessary?
+    public Frame ContentFrame { get; set; }
+    public LayoutPool LayoutPool { get; set; }
+    // necessary?
     public Scroll Scroll { get; private set; }
-    //public Table Table { get; set; }
-    
   }
 
-  /// <summary>
-  /// Long-lived objects
-  /// RowDocks contain frames which are loaded with CellPanels
-  ///
-  /// </summary>
   public class LayoutPool
   {
-    public List<Frame> Frames { get; set; }
-    public List<Panel> CellPanels { get; set; }
-    public List<Dock> RowDocks { get; set; }
-    public Table Table { get; set; }
-
-    public Surface Surface { get; set; }
-    private int Size;
-
-    public LayoutPool(Surface surface, int size, int rows)
+    private readonly int Size;
+    public LayoutPool(Surface surface, int size, int rows, int cols)
     {
       Surface = surface;
-      
+
       Size = size;
+      Rows = rows;
+      Cols = cols;
       Frames = new List<Frame>(size);
       for (int i = 0; i < size; i++)
       {
@@ -121,48 +107,31 @@ namespace InvDefault
       BuildTable();
     }
 
+    private List<Panel> CellPanels              { get; set; }
+    private int         Cols                    { get; set; }
+    private List<Frame> Frames                  { get; set; }
+    private List<Dock>  RowDocks                { get; set; }
+    private int         Rows                    { get; set; }
+    private Surface     Surface                 { get; set; }
+    public  Table       Table                   { get; set; }
+
+    public void AddCellPanel(WebGraphic cell) => CellPanels.Insert(0, cell);
+
     public void BuildTable()
     {
       Table = Surface.NewTable();
       var tableColumn = Table.AddColumn();
       tableColumn.Star();
 
-      // 3 columns by 11 rows
-      for (int r = 0; r < 11; r++)
+      for (int r = 0; r < Rows; r++)
       {
         var tableRow = Table.AddRow();
         tableRow.Auto();
-
-
         var row = RowDocks[r];
-        for (int c = 0; c < 3; c++)
-        {
-          row.AddClient(Frames[r * 3 + c]);
-
-        }
-        //Table.AddPanel(row);
+        for (int c = 0; c < Cols; c++)
+          row.AddClient(Frames[r * Cols + c]);
         Table.GetCell(0, r).Content = row;
       }
-    }
-
-    public void UpdateLayout()
-    {
-      for (int r = 0; r < 11; r++)
-      {
-        for (int c = 0; c < 3; c++)
-        {
-          var index = r * 3 + c;
-          var frame = Frames[index];
-          var cell = CellPanels[index];
-          frame.Transition(cell).Fade();
-        }
-      }
-
-    }
-
-    public void AddCellPanel(WebGraphic cell)
-    {
-      CellPanels.Insert(0, cell);
     }
 
     public void Reclaim()
@@ -180,6 +149,15 @@ namespace InvDefault
       }
     }
 
+    public void UpdateLayout()
+    {
+      for (int i = 0; i < Size; i++)
+      {
+        var frame = Frames[i];
+        var cell = CellPanels[i];
+        frame.Transition(cell).Fade();
+      }
+    }
     private static int NextPrime(int a)
     {
       while (true) { a++; if (a < 2) continue; if (a == 2) break; if (a % 2 == 0) continue; bool flag = false; for (int i = 3; (i * i) <= a; i += 2) { if (a % i == 0) { flag = true; break; } } if (!flag) break; }
@@ -237,10 +215,9 @@ namespace InvDefault
 
     public Alignment Alignment => Base.Alignment;
     public double? aspectRatio { get; set; }
+    public Background Background => Base.Background;
     public Margin Margin => Base.Margin;
     public Size Size => Base.Size;
-    public Background Background => Base.Background;
-
     public static String GetMD5Hash(String TextToHash)
 
     {
