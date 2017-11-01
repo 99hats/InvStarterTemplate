@@ -7,7 +7,6 @@ using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
 using Inv.Support;
-using Graphics = System.Drawing.Graphics;
 
 namespace InvDefault
 {
@@ -53,7 +52,7 @@ namespace InvDefault
     }
   }
 
-  public class AssetPanel : Mimic<Button>
+  public class AssetPanel : Mimic<Button>, IDisposable
   {
     public Surface Surface { get; }
     public Models.Asset Asset { get; set; }
@@ -64,41 +63,54 @@ namespace InvDefault
       Base = surface.NewButton();
       Asset = asset;
 
+      WebGraphic = new WebGraphic(surface, Asset.uri);
+      WebGraphic.Alignment.Stretch();
+
       var title = surface.NewLabel();
       title.Text = Asset.title;
 
-      var graphic = new WebGraphic(surface, Asset.uri);
-      var width = surface.Window.Width / 3;
-      var height = graphic.aspectHeight(width);
-      graphic.Size.Set(surface.Window.Width/3, height);
-      graphic.Alignment.Stretch();
-
-     
-      var verticalDock = surface.NewVerticalStack();
+      var verticalDock = surface.NewVerticalDock();
       verticalDock.Alignment.Stretch();
-      verticalDock.AddPanel(graphic);
-      verticalDock.AddPanel(title);
-      verticalDock.Readjust();
+      verticalDock.AddHeader(WebGraphic);
+      verticalDock.AddClient(title);
       Base.Content = verticalDock;
-      Base.Readjust();
+
+      surface.ArrangeEvent += OnAdjustEvent;
+
+      void OnAdjustEvent()
+      {
+        if (surface.Window.Width < 1) return;
+        var width = surface.Window.Width / 3;
+        var height = WebGraphic.aspectHeight(width);
+        WebGraphic.Size.Set(surface.Window.Width / 3, height);
+        verticalDock.Readjust();
+      };
     }
 
+    public WebGraphic WebGraphic { get; set; }
+
     public Size Size => Base.Size;
+    public Size GraphicSize => WebGraphic.Size;
     public Alignment Alignment => Base.Alignment;
     public Background Background => Base.Background;
     public Margin Margin => Base.Margin;
+    public void Readjust() => Base.Readjust();
 
+    public void Dispose()
+    {
+      WebGraphic.Dispose();
+    }
   }
 
   internal sealed class MainPage : Mimic<Stack>
   {
-    private int imageId;
+    private int imageCounter;
 
-    private List<Models.Asset> Assets     { get; set; } = new List<Models.Asset>();
-    private List<Dock>        Rows       { get; set; } = new List<Dock>();
-    private List<Frame>        Frames     { get; set; } = new List<Frame>();
-    private List<Panel>        Cells      { get; set; } = new List<Panel>();
-    private Stack              PageLayout { get; set; } = null;
+    private List<Models.Asset>      Assets     { get; set; } = new List<Models.Asset>();
+    private List<Dock>              Rows       { get; set; } = new List<Dock>();
+    private List<Frame>             Frames     { get; set; } = new List<Frame>();
+    private List<AssetPanel>        Cells      { get; set; } = new List<AssetPanel>(71);
+    private Stack                   PageLayout { get; set; } = null;
 
     public MainPage(Surface surface)
     {
@@ -147,16 +159,29 @@ namespace InvDefault
 
       surface.ArrangeEvent += () =>
       {
-        Models.Asset.CreateAssets(33)
-          .ForEach(x => Cells.Insert(0, new AssetPanel(surface, x)));
 
-        Frames.ForEach(x=>x.Content = null);
         for (int i = 0; i < Frames.Count; i++)
         {
-          Frames[i].Transition(Cells[i]).Fade();
+          var cell = Cells[i];
+          Frames[i].Transition(cell).Fade();
         }
-        Rows.ForEach(x=>x.Readjust());
-        PageLayout.Readjust();
+
+        Models.Asset.CreateAssets(6)
+          .ForEach(x => Cells.Insert(0, new AssetPanel(surface, x)));
+
+        if (Cells.Count > 66)
+        {
+          Debug.WriteLine($"Reclaiming at {Cells.Count}");
+          //dispose
+          Cells.Skip(34).ForEach(x=> (x as IDisposable)?.Dispose());
+          //for (int i = 33; i < Cells.Count - 33; i++)
+          //  (Cells.ElementAt(i) as IDisposable)?.Dispose();
+          //deref
+          Cells.RemoveRange(34, Cells.Count - 34);
+          //reclaim
+          surface.Window.Application.Process.MemoryReclamation();
+
+        }
       };
 
     }
