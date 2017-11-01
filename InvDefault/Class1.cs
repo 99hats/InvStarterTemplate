@@ -7,6 +7,7 @@ using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
 using Inv.Support;
+using Graphics = System.Drawing.Graphics;
 
 namespace InvDefault
 {
@@ -36,18 +37,19 @@ namespace InvDefault
     {
       public string title { get; set; }
       public string uri { get; set; }
-    }
 
-    public static List<Asset> CreateAssets(int num)
-    {
-      List<Asset> result = new List<Asset>();
-      for (int i = 0; i < num; i++)
+      public static List<Asset> CreateAssets(int num)
       {
-        result.Add(new Asset{ title = Colour.All[i + last].ToString(), uri = $"http://picsum.photos/300/200/?image={i+last}"});
+        List<Asset> result = new List<Asset>();
+        for (int i = 0; i < num; i++)
+        {
+          result.Add(new Asset { title = $"{Colour.All[i + last].ToString()} {i + last}", uri = $"http://picsum.photos/300/200/?image={i + last}" });
+        }
+        Debug.WriteLine($"last {last}");
+        last += num;
+        if (last > 99) last = 0;
+        return result;
       }
-      last += num;
-      if (last > 99) last = 0;
-      return result;
     }
   }
 
@@ -64,14 +66,11 @@ namespace InvDefault
 
       var title = surface.NewLabel();
       title.Text = Asset.title;
-      //title.Font.Size = 24;
 
       var graphic = new WebGraphic(surface, Asset.uri);
       var width = surface.Window.Width / 3;
       var height = graphic.aspectHeight(width);
       graphic.Size.Set(surface.Window.Width/3, height);
-      //var graphic = surface.NewGraphic();
-      //graphic.Image = InvMedia.Resources.Images.Logo;
       graphic.Alignment.Stretch();
 
      
@@ -91,65 +90,79 @@ namespace InvDefault
 
   }
 
-  internal sealed class MainPage : Mimic<Dock>
+  internal sealed class MainPage : Mimic<Stack>
   {
     private int imageId;
 
-    private List<Models.Asset> Assets { get; set; }
+    private List<Models.Asset> Assets     { get; set; } = new List<Models.Asset>();
+    private List<Dock>        Rows       { get; set; } = new List<Dock>();
+    private List<Frame>        Frames     { get; set; } = new List<Frame>();
+    private List<Panel>        Cells      { get; set; } = new List<Panel>();
+    private Stack              PageLayout { get; set; } = null;
 
     public MainPage(Surface surface)
     {
-      Base = surface.NewVerticalDock();
 
-      Assets = Models.CreateAssets(38);
+      Base = surface.NewVerticalStack();
+      var cols = 3;
+      var rows = 11;
+      var matrixSize = rows * cols;
 
-      HeroLayoutPool = new LayoutPool(surface, 1, 1, 1);
-      ATFLayoutPool = new LayoutPool(surface, 3, 1, 3);
-      BTFLayoutPool = new LayoutPool(surface, 33, 11, 3);
+      Header = surface.NewFrame();
+      Header.Size.SetHeight(80);
+      Header.Alignment.Stretch();
+      Header.Background.Colour = Colour.DodgerBlue;
+      Base.AddPanel(Header);
 
-      ContentFrame = surface.NewFrame();
-      Base.AddClient(ContentFrame);
-      imageId = 0;
-
-      surface.ArrangeEvent += UpdateUI;
-
-      AddBelowTheFold(5, 33);
-
-      void AddBelowTheFold(int start, int num)
-      {
-        for (int i = start; i < num; i++)
-        {
-          var asset = new AssetPanel(surface, Assets[i]);
-          asset.Alignment.Stretch();
-          asset.Margin.Set(8);
-          BTFLayoutPool.AddCellPanel(asset);
-        }
-      }
-
-      // layout
       Scroll = surface.NewVerticalScroll();
-      Scroll.Content = BTFLayoutPool.Table;
-      ContentFrame.Transition(Scroll);
+      Base.AddPanel(Scroll);
 
-      void UpdateUI()
+      // init assets
+      Models.Asset.CreateAssets(33)
+        .ForEach(x => Cells.Insert(0, new AssetPanel(surface, x)));
+
+      // init frames
+      for (var i = 0; i < matrixSize; i++)
+        Frames.Add(surface.NewFrame());
+
+      // init rows
+      for (var r = 0; r < rows; r++)
+        Rows.Add(surface.NewHorizontalDock());
+
+      // init layout
+      PageLayout = surface.NewVerticalStack();
+      for (int r = 0; r < rows; r++)
       {
-        if (surface.Window.Width < 1) return;
-        AddBelowTheFold(5,33);
-        BTFLayoutPool.Reclaim();
-        BTFLayoutPool.UpdateLayout();
-
-        if (imageId > 99) imageId = 0;
-
-        Debug.WriteLine($"{surface.Window.Application.Process.GetMemoryUsage().TotalMegabytes}mb {imageId}");
+        for (int c = 0; c < cols; c++)
+        {
+          var index = r * 3 + c;
+          Debug.WriteLine($"index {index} / {r}");
+          Frames[index].Transition(Cells[index]).Fade();
+          Rows[r].AddClient(Frames[index]);
+         
+        }
+        PageLayout.AddPanel(Rows[r]);
       }
+      Scroll.Content = PageLayout;
+
+      surface.ArrangeEvent += () =>
+      {
+        Models.Asset.CreateAssets(33)
+          .ForEach(x => Cells.Insert(0, new AssetPanel(surface, x)));
+
+        Frames.ForEach(x=>x.Content = null);
+        for (int i = 0; i < Frames.Count; i++)
+        {
+          Frames[i].Transition(Cells[i]).Fade();
+        }
+        Rows.ForEach(x=>x.Readjust());
+        PageLayout.Readjust();
+      };
+
     }
 
-    public LayoutPool HeroLayoutPool { get; set; }
+    public Frame Header { get; set; }
 
-    public LayoutPool ATFLayoutPool { get; set; }
-
-    private Frame ContentFrame { get; set; }
-    private LayoutPool BTFLayoutPool { get; set; }
     private Scroll Scroll { get; }
   }
 
@@ -176,7 +189,6 @@ namespace InvDefault
         var dock = surface.NewHorizontalDock();
         RowDocks.Add(dock);
       }
-      BuildTable();
     }
 
     private List<Panel> CellPanels              { get; }
@@ -185,26 +197,9 @@ namespace InvDefault
     private List<Dock>  RowDocks                { get; }
     private int         Rows                    { get; }
     private Surface     Surface                 { get; }
-    public  Table       Table                   { get; set; }
 
     public void AddCellPanel(Panel cell) => CellPanels.Insert(0, cell);
 
-    public void BuildTable()
-    {
-      Table = Surface.NewTable();
-      var tableColumn = Table.AddColumn();
-      tableColumn.Star();
-
-      for (int r = 0; r < Rows; r++)
-      {
-        var tableRow = Table.AddRow();
-        tableRow.Auto();
-        var row = RowDocks[r];
-        for (int c = 0; c < Cols; c++)
-          row.AddClient(Frames[r * Cols + c]);
-        Table.GetCell(0, r).Content = row;
-      }
-    }
 
     public void Reclaim()
     {
@@ -300,7 +295,12 @@ namespace InvDefault
       return BitConverter.ToString(result);
     }
 
-    public int aspectHeight(int width) => (int)(aspectRatio * width);
+    public int aspectHeight(int width)
+    {
+      var d = aspectRatio * width;
+      if (d != null) return (int) d;
+      return 0;
+    }
 
     public void Dispose()
     {
