@@ -107,14 +107,13 @@ namespace InvDefault
     private int imageCounter;
 
     private List<Models.Asset>      Assets     { get; set; } = new List<Models.Asset>();
-    private List<Dock>              Rows       { get; set; } = new List<Dock>();
-    private List<Frame>             Frames     { get; set; } = new List<Frame>();
+    private List<Dock>              Rows       { get; set; } = new List<Dock>(13);
+    private List<Frame>             Frames     { get; set; } = new List<Frame>(71);
     private List<AssetPanel>        Cells      { get; set; } = new List<AssetPanel>(71);
     private Stack                   PageLayout { get; set; } = null;
 
     public MainPage(Surface surface)
     {
-
       Base = surface.NewVerticalStack();
       var cols = 3;
       var rows = 11;
@@ -147,7 +146,7 @@ namespace InvDefault
       {
         for (int c = 0; c < cols; c++)
         {
-          var index = r * 3 + c;
+          var index = r * cols + c;
           Debug.WriteLine($"index {index} / {r}");
           Frames[index].Transition(Cells[index]).Fade();
           Rows[r].AddClient(Frames[index]);
@@ -159,6 +158,22 @@ namespace InvDefault
 
       surface.ArrangeEvent += () =>
       {
+        if (Cells.Count > matrixSize * 2)
+        {
+          Debug.WriteLine($"Reclaiming at {Cells.Count}");
+          //dispose
+          //Cells.Skip(matrixSize* 2).ForEach(x => (x as IDisposable)?.Dispose());
+          for (int i = matrixSize; i < Cells.Count; i++)
+          {
+            Debug.WriteLine($"Dispose {i}");
+            Cells[i].Dispose();
+          }
+          //deref
+          Cells.RemoveRange(matrixSize, Cells.Count - matrixSize);
+          //reclaim
+          surface.Window.Application.Process.MemoryReclamation();
+
+        }
 
         for (int i = 0; i < Frames.Count; i++)
         {
@@ -168,20 +183,6 @@ namespace InvDefault
 
         Models.Asset.CreateAssets(6)
           .ForEach(x => Cells.Insert(0, new AssetPanel(surface, x)));
-
-        if (Cells.Count > 66)
-        {
-          Debug.WriteLine($"Reclaiming at {Cells.Count}");
-          //dispose
-          Cells.Skip(34).ForEach(x=> (x as IDisposable)?.Dispose());
-          //for (int i = 33; i < Cells.Count - 33; i++)
-          //  (Cells.ElementAt(i) as IDisposable)?.Dispose();
-          //deref
-          Cells.RemoveRange(34, Cells.Count - 34);
-          //reclaim
-          surface.Window.Application.Process.MemoryReclamation();
-
-        }
       };
 
     }
@@ -329,7 +330,8 @@ namespace InvDefault
 
     public void Dispose()
     {
-      Base.Surface.Window.Call(() => { Base.Image = null; });
+      // important: use post not call here
+      Base.Surface.Window.Post(() => { Base.Image = null; });
     }
   }
 }
