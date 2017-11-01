@@ -6,7 +6,6 @@ using System.IO;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
-using Inv.Support;
 
 namespace InvDefault
 {
@@ -29,7 +28,6 @@ namespace InvDefault
 
   public static class Models
   {
-
     public static int last { get; set; } = 0;
 
     public class Asset
@@ -94,6 +92,7 @@ namespace InvDefault
     public Alignment Alignment => Base.Alignment;
     public Background Background => Base.Background;
     public Margin Margin => Base.Margin;
+
     public void Readjust() => Base.Readjust();
 
     public void Dispose()
@@ -102,15 +101,107 @@ namespace InvDefault
     }
   }
 
+
+  /// <summary>
+  /// Caching safety harness... encapuslate a lot of steps.
+  /// </summary>
+  public class LayoutPoolTwo
+  {
+    private readonly Surface _surface;
+    private readonly int _cols;
+    private readonly int _rows;
+    private int _matrixSize;
+
+    private List<Dock> Rows { get; set; } = new List<Dock>(13);
+    private List<Frame> Frames { get; set; } = new List<Frame>(71);
+    public List<AssetPanel> Cells { get; set; } = new List<AssetPanel>(71);
+    public Stack PageLayout { get; set; } = null;
+
+    public LayoutPoolTwo(Surface surface, int cols, int rows, IEnumerable<AssetPanel> assetPanels)
+    {
+      _surface = surface;
+      _cols = cols;
+      _rows = rows;
+      _matrixSize = cols * rows;
+
+      Cells.AddRange(assetPanels);
+    }
+
+    /// <summary>
+    /// Possible candidate for fluent api
+    /// </summary>
+    public void Init()
+    {
+      Debug.Assert(Cells.Count > 0); // must populate cells before init, should probably include that in the ctor
+
+      // init frames
+      for (var i = 0; i < _matrixSize; i++)
+        Frames.Add(_surface.NewFrame());
+
+      // init rows
+      for (var r = 0; r < _rows; r++)
+        Rows.Add(_surface.NewHorizontalDock());
+
+      // init layout
+      PageLayout = _surface.NewVerticalStack();
+      for (int r = 0; r < _rows; r++)
+      {
+        for (int c = 0; c < _cols; c++)
+        {
+          var index = r * _cols + c;
+          Debug.WriteLine($"index {index} / {r}");
+          Frames[index].Transition(Cells[index]).Fade();
+          Rows[r].AddClient(Frames[index]);
+        }
+        PageLayout.AddPanel(Rows[r]);
+      }
+    }
+
+    public void Update()
+    {
+      for (int i = 0; i < Frames.Count; i++)
+      {
+        var cell = Cells[i];
+        Frames[i].Transition(cell).Fade();
+      }
+    }
+    /// <summary>
+    /// Call after update
+    /// </summary>
+    public void Prune()
+    {
+      if (Cells.Count > _matrixSize * 2)
+      {
+        Debug.WriteLine($"Reclaiming at {Cells.Count}");
+        //dispose
+        //Cells.Skip(matrixSize* 2).ForEach(x => (x as IDisposable)?.Dispose());
+        for (int i = _matrixSize; i < Cells.Count; i++)
+        {
+          Debug.WriteLine($"Dispose {i}");
+          Cells[i].Dispose();
+        }
+        //deref
+        Cells.RemoveRange(_matrixSize, Cells.Count - _matrixSize);
+        //reclaim
+        _surface.Window.Application.Process.MemoryReclamation();
+      }
+
+      //Models.Asset.CreateAssets(6)
+      //  .ForEach(x => Cells.Insert(0, new AssetPanel(_surface, x)));
+    }
+  }
+
   internal sealed class MainPage : Mimic<Stack>
   {
     private int imageCounter;
 
-    private List<Models.Asset>      Assets     { get; set; } = new List<Models.Asset>();
-    private List<Dock>              Rows       { get; set; } = new List<Dock>(13);
-    private List<Frame>             Frames     { get; set; } = new List<Frame>(71);
-    private List<AssetPanel>        Cells      { get; set; } = new List<AssetPanel>(71);
-    private Stack                   PageLayout { get; set; } = null;
+    private List<Models.Asset> Assets { get; set; } = new List<Models.Asset>();
+    private List<Dock> Rows { get; set; } = new List<Dock>(13);
+    private List<Frame> Frames { get; set; } = new List<Frame>(71);
+    private List<AssetPanel> Cells { get; set; } = new List<AssetPanel>(71);
+    private Stack PageLayout { get; set; } = null;
+
+    private LayoutPoolTwo LayoutPool { get; set; }
 
     public MainPage(Surface surface)
     {
@@ -118,6 +209,11 @@ namespace InvDefault
       var cols = 3;
       var rows = 11;
       var matrixSize = rows * cols;
+
+      var cells = Models.Asset.CreateAssets(33)
+        .Select(x => new AssetPanel(surface, x));
+
+      LayoutPool = new LayoutPoolTwo(surface, cols, rows, cells);
 
       Header = surface.NewFrame();
       Header.Size.SetHeight(80);
@@ -128,63 +224,51 @@ namespace InvDefault
       Scroll = surface.NewVerticalScroll();
       Base.AddPanel(Scroll);
 
-      // init assets
-      Models.Asset.CreateAssets(33)
-        .ForEach(x => Cells.Insert(0, new AssetPanel(surface, x)));
+      //// init assets
+      //Models.Asset.CreateAssets(33)
+      //  .ForEach(x => LayoutPool.Cells.Insert(0, new AssetPanel(surface, x)));
 
-      // init frames
-      for (var i = 0; i < matrixSize; i++)
-        Frames.Add(surface.NewFrame());
 
-      // init rows
-      for (var r = 0; r < rows; r++)
-        Rows.Add(surface.NewHorizontalDock());
 
-      // init layout
-      PageLayout = surface.NewVerticalStack();
-      for (int r = 0; r < rows; r++)
-      {
-        for (int c = 0; c < cols; c++)
-        {
-          var index = r * cols + c;
-          Debug.WriteLine($"index {index} / {r}");
-          Frames[index].Transition(Cells[index]).Fade();
-          Rows[r].AddClient(Frames[index]);
-         
-        }
-        PageLayout.AddPanel(Rows[r]);
-      }
-      Scroll.Content = PageLayout;
+      LayoutPool.Init();
+
+      //// init frames
+      //for (var i = 0; i < matrixSize; i++)
+      //  Frames.Add(surface.NewFrame());
+
+      //// init rows
+      //for (var r = 0; r < rows; r++)
+      //  Rows.Add(surface.NewHorizontalDock());
+
+      //// init layout
+      //PageLayout = surface.NewVerticalStack();
+      //for (int r = 0; r < rows; r++)
+      //{
+      //  for (int c = 0; c < cols; c++)
+      //  {
+      //    var index = r * cols + c;
+      //    Debug.WriteLine($"index {index} / {r}");
+      //    Frames[index].Transition(Cells[index]).Fade();
+      //    Rows[r].AddClient(Frames[index]);
+      //  }
+      //  PageLayout.AddPanel(Rows[r]);
+      //}
+
+      Scroll.Content = LayoutPool.PageLayout;
 
       surface.ArrangeEvent += () =>
       {
-        if (Cells.Count > matrixSize * 2)
+        surface.Window.Post(() =>
         {
-          Debug.WriteLine($"Reclaiming at {Cells.Count}");
-          //dispose
-          //Cells.Skip(matrixSize* 2).ForEach(x => (x as IDisposable)?.Dispose());
-          for (int i = matrixSize; i < Cells.Count; i++)
-          {
-            Debug.WriteLine($"Dispose {i}");
-            Cells[i].Dispose();
-          }
-          //deref
-          Cells.RemoveRange(matrixSize, Cells.Count - matrixSize);
-          //reclaim
-          surface.Window.Application.Process.MemoryReclamation();
 
-        }
+          Models.Asset.CreateAssets(3)
+            .ForEach(x => LayoutPool.Cells.Insert(0, new AssetPanel(surface, x)));
+          LayoutPool.Update();
+          LayoutPool.Prune();
+        });
 
-        for (int i = 0; i < Frames.Count; i++)
-        {
-          var cell = Cells[i];
-          Frames[i].Transition(cell).Fade();
-        }
 
-        Models.Asset.CreateAssets(6)
-          .ForEach(x => Cells.Insert(0, new AssetPanel(surface, x)));
       };
-
     }
 
     public Frame Header { get; set; }
@@ -195,6 +279,7 @@ namespace InvDefault
   public class LayoutPool
   {
     private readonly int Size;
+
     public LayoutPool(Surface surface, int size, int rows, int cols)
     {
       Surface = surface;
@@ -217,15 +302,14 @@ namespace InvDefault
       }
     }
 
-    private List<Panel> CellPanels              { get; }
-    private int         Cols                    { get; }
-    private List<Frame> Frames                  { get; }
-    private List<Dock>  RowDocks                { get; }
-    private int         Rows                    { get; }
-    private Surface     Surface                 { get; }
+    private List<Panel> CellPanels { get; }
+    private int Cols { get; }
+    private List<Frame> Frames { get; }
+    private List<Dock> RowDocks { get; }
+    private int Rows { get; }
+    private Surface Surface { get; }
 
     public void AddCellPanel(Panel cell) => CellPanels.Insert(0, cell);
-
 
     public void Reclaim()
     {
@@ -251,6 +335,7 @@ namespace InvDefault
         frame.Transition(cell).Fade();
       }
     }
+
     private static int NextPrime(int a)
     {
       while (true) { a++; if (a < 2) continue; if (a == 2) break; if (a % 2 == 0) continue; bool flag = false; for (int i = 3; (i * i) <= a; i += 2) { if (a % i == 0) { flag = true; break; } } if (!flag) break; }
@@ -312,6 +397,7 @@ namespace InvDefault
     public Background Background => Base.Background;
     public Margin Margin => Base.Margin;
     public Size Size => Base.Size;
+
     public static String GetMD5Hash(String TextToHash)
 
     {
@@ -324,7 +410,7 @@ namespace InvDefault
     public int aspectHeight(int width)
     {
       var d = aspectRatio * width;
-      if (d != null) return (int) d;
+      if (d != null) return (int)d;
       return 0;
     }
 
